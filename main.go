@@ -75,7 +75,7 @@ func getPlaylistVideos(cfg *Config) ([]string, error) {
 		params.Set("key", cfg.YouTubeAPIKey)
 		params.Set("pageToken", pageToken)
 		// ここでリクエスト
-		fmt.Println("GET here ----------")
+		fmt.Println("GET request initiated")
 		resp, err := http.Get(baseURL + "?" + params.Encode())
 		if err != nil {
 			log.Fatalf("HTTP GET Err: %v", err)
