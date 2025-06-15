@@ -34,7 +34,7 @@ func LoadConfig()(*Config, error) {
 
 	id := os.Getenv("YOUTUBE_PLAYLIST_ID")
 	if id == "" {
-		log.Fatal("YOUTUBE_PLAYLIST_ID environment variable is not set")
+		return nil, errors.New("YOUTUBE_PLAYLIST_ID is nil")
 	}
 
 	return &Config{
@@ -57,7 +57,7 @@ func getPlaylistVideos(cfg *Config) ([]string, error) {
 		} `json:"items"`
 		PageInfo       struct {
 			TotalResults int `json:"totalResults"`
-			ResultPerPage int `json:"resultsPerPage"`
+			ResultsPerPage int `json:"resultsPerPage"`
 		} `json:"pageInfo"`
 	}
 
@@ -74,11 +74,12 @@ func getPlaylistVideos(cfg *Config) ([]string, error) {
 		params.Set("playlistId", cfg.PlaylistId)
 		params.Set("key", cfg.YouTubeAPIKey)
 		params.Set("pageToken", pageToken)
+		// params.Set("maxResults", "50")
 		// ここでリクエスト
 		fmt.Println("GET request initiated")
 		resp, err := http.Get(baseURL + "?" + params.Encode())
 		if err != nil {
-			log.Fatalf("HTTP GET Err: %v", err)
+			return nil, fmt.Errorf("HTTP GET error: %w", err)
 		}
 		// defer resp.Body.Close()
 
