@@ -9,6 +9,7 @@ import (
 	"os"
 	"errors"
 	"io"
+	"encoding/json"
 
 	"github.com/joho/godotenv"
 )
@@ -42,54 +43,77 @@ func LoadConfig()(*Config, error) {
 	}, nil
 }
 
-
-type playlistItemsResponse struct {
-	NextPageToken string
-	Items         []struct {
-		ContentDetails struct {
-			VideoID     string
-		}
-	}
-}
-
 func getPlaylistVideos(cfg *Config) ([]string, error) {
+	// apidocs: https://developers.google.com/youtube/v3/docs/playlistItems/list?hl=ja
+
 	const baseURL = "https://www.googleapis.com/youtube/v3/playlistItems"
-	// var (
-	// 	videoIDs []string
-	// 	pageToken string
-	// )
-	// for {
-	// }
-	params := url.Values{}
-	params.Set("part", "contentDetails")
-	// params.Set("part", "snippet")
-	params.Set("playlistId", cfg.PlaylistId)
-	params.Set("key", cfg.YouTubeAPIKey)
-	// ここでリクエスト
-	resp, err := http.Get(baseURL + "?" + params.Encode())
-	if err != nil {
-		log.Fatalf("HTTP GET Err: %v", err)
-	}
-	defer resp.Body.Close()
 
-	// レスポンスボディをそのまま標準出力に
-	if _, err := io.Copy(os.Stdout, resp.Body); err != nil {
-		log.Fatalf("レスポンス読み込みエラー: %v", err)
+	type playlistItemsResponse struct {
+		NextPageToken string `json:"nextPageToken"`
+		Items         []struct {
+			ContentDetails struct {
+				VideoID string `json:"videoId"`
+			} `json:"contentDetails"`
+		} `json:"items"`
+		PageInfo       struct {
+			TotalResults int `json:"totalResults"`
+			ResultPerPage int `json:"resultsPerPage"`
+		} `json:"pageInfo"`
 	}
 
-	var testdata []string
+	var (
+		videoIDs []string
+		pageToken string
+	)
 
-	return testdata, nil
-	// return videoIDs, nil
+	for {
+		// 組み立てる
+		params := url.Values{}
+		params.Set("part", "contentDetails")
+		// params.Set("part", "snippet")
+		params.Set("playlistId", cfg.PlaylistId)
+		params.Set("key", cfg.YouTubeAPIKey)
+		params.Set("pageToken", pageToken)
+		// ここでリクエスト
+		fmt.Println("GET here ----------")
+		resp, err := http.Get(baseURL + "?" + params.Encode())
+		if err != nil {
+			log.Fatalf("HTTP GET Err: %v", err)
+		}
+		defer resp.Body.Close()
 
+		// fmt.Println("RESP: -------")
+		// fmt.Println(resp.StatusCode)
+		// fmt.Println("RESP: -------")
+		// body, _ := io.ReadAll(resp.Body)
+		// fmt.Println(string(body))
+		// fmt.Println("-------------")
 
+		if resp.StatusCode != http.StatusOK {
+			// エラー
+			body, _ := io.ReadAll(resp.Body)
+			return nil, fmt.Errorf("API error: status %d: %s", resp.StatusCode, string(body))
+		}
 
-	// res, err := http.Get(cfg.PlaylistId)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// defer res.Body.Close()
-	// return []string{"video1", "video2", "video3"}, nil
+		// jsonをデコード
+		var result playlistItemsResponse
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			return nil, fmt.Errorf("JSON decode error: %w", err)
+		}
+
+		for _, item := range result.Items {
+			videoIDs = append(videoIDs, item.ContentDetails.VideoID)
+		}
+
+		fmt.Println("Video IDs:", videoIDs)
+		fmt.Println("Page Info:", result.PageInfo)
+		if result.NextPageToken == "" {
+			break
+		}
+		pageToken = result.NextPageToken
+		fmt.Println("Next Page Token:", result.NextPageToken)
+	}
+	return videoIDs, nil
 }
 
 func main() {
@@ -98,6 +122,15 @@ func main() {
 		fmt.Fprintf(os.Stderr, "failed to load config: %v\n", err)
 		os.Exit(1)
 	}
-
-	_, _ = getPlaylistVideos(cfg)
+	fmt.Println("---func getPlaylistVideos(cfg *Config) Started---")
+	videoIDs, err := getPlaylistVideos(cfg)
+	fmt.Println("---func getPlaylistVideos(cfg *Config) Finished---")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to get playlist videos: %v\n", err)
+		os.Exit(1)
+	}
+	for i, videoID := range videoIDs {
+		fmt.Printf("Video ID:%d: %s\n", i, videoID)
+	}
+	fmt.Println("Total videos:", len(videoIDs))
 }
