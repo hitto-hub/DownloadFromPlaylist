@@ -80,7 +80,7 @@ func getPlaylistVideos(cfg *Config) ([]string, error) {
 		if err != nil {
 			log.Fatalf("HTTP GET Err: %v", err)
 		}
-		defer resp.Body.Close()
+		// defer resp.Body.Close()
 
 		// fmt.Println("RESP: -------")
 		// fmt.Println(resp.StatusCode)
@@ -92,12 +92,14 @@ func getPlaylistVideos(cfg *Config) ([]string, error) {
 		if resp.StatusCode != http.StatusOK {
 			// エラー
 			body, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
 			return nil, fmt.Errorf("API error: status %d: %s", resp.StatusCode, string(body))
 		}
 
 		// jsonをデコード
 		var result playlistItemsResponse
 		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			resp.Body.Close()
 			return nil, fmt.Errorf("JSON decode error: %w", err)
 		}
 
@@ -108,6 +110,7 @@ func getPlaylistVideos(cfg *Config) ([]string, error) {
 		fmt.Println("Video IDs:", videoIDs)
 		fmt.Println("Page Info:", result.PageInfo)
 		if result.NextPageToken == "" {
+			resp.Body.Close()
 			break
 		}
 		pageToken = result.NextPageToken
