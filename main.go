@@ -140,7 +140,7 @@ func downloadVideo(ctx context.Context, videoID string) error {
 	}
 	dl, err := sess.Download(ctx, "best")
 	if err != nil {
-		return fmt.Errorf("Download failed: %w", err)
+		return fmt.Errorf("download failed: %w", err)
 	}
 	defer dl.Close()
 
@@ -163,17 +163,17 @@ func main() {
 		fmt.Fprintf(os.Stderr, "failed to load config: %v\n", err)
 		os.Exit(1)
 	}
-	fmt.Println("---func getPlaylistVideos(cfg *Config) Started---")
+
 	videoIDs, err := getPlaylistVideos(cfg)
-	fmt.Println("---func getPlaylistVideos(cfg *Config) Finished---")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to get playlist videos: %v\n", err)
 		os.Exit(1)
 	}
+	log.Printf("Found %d videos", len(videoIDs))
+
 	for i, videoID := range videoIDs {
-		fmt.Printf("Video ID:%d: %s\n", i, videoID)
+		log.Printf("Video ID:%d: %s", i, videoID)
 	}
-	fmt.Println("Total videos:", len(videoIDs))
 
 	ctx := context.Background()
 	for _, videoID := range videoIDs {
