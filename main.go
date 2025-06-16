@@ -10,6 +10,10 @@ import (
 	"errors"
 	"io"
 	"encoding/json"
+	"context"
+	"time"
+
+	"github.com/wader/goutubedl"
 
 	"github.com/joho/godotenv"
 )
@@ -19,6 +23,7 @@ func init() {
 	if err := godotenv.Load(); err != nil {
 			log.Println(".env ファイルが見つかりませんでした（環境変数が既にセットされている可能性があります）")
 	}
+	goutubedl.Path = "yt-dlp"
 }
 
 type Config struct {
@@ -120,26 +125,66 @@ func getPlaylistVideos(cfg *Config) ([]string, error) {
 	return videoIDs, nil
 }
 
+func downloadVideo(ctx context.Context, videoID string) error {
+	videoURL := "https://www.youtube.com/watch?v=" + videoID
+	out := videoID + ".mp4"
+
+	// タイムアウト付きコンテキスト（例：動画あたり 60 秒）
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+
+	opts := goutubedl.Options{}
+	sess, err := goutubedl.New(ctx, videoURL, opts)
+	if err != nil {
+		return fmt.Errorf("goutubedl.New: %w", err)
+	}
+	dl, err := sess.Download(ctx, "best")
+	if err != nil {
+		return fmt.Errorf("download failed: %w", err)
+	}
+	defer dl.Close()
+
+	f, err := os.Create(out)
+	if err != nil {
+		return fmt.Errorf("file create failed: %w", err)
+	}
+	defer f.Close()
+
+	if _, err := io.Copy(f, dl); err != nil {
+		return fmt.Errorf("file write failed: %w", err)
+	}
+	log.Printf("Saved %s", out)
+	return nil
+}
+
 func main() {
 	cfg, err := LoadConfig()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to load config: %v\n", err)
 		os.Exit(1)
 	}
-	fmt.Println("---func getPlaylistVideos(cfg *Config) Started---")
+
 	videoIDs, err := getPlaylistVideos(cfg)
-	fmt.Println("---func getPlaylistVideos(cfg *Config) Finished---")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to get playlist videos: %v\n", err)
 		os.Exit(1)
 	}
+	log.Printf("Found %d videos", len(videoIDs))
+
 	for i, videoID := range videoIDs {
-		fmt.Printf("Video ID:%d: %s\n", i, videoID)
+		log.Printf("Video ID:%d: %s", i, videoID)
 	}
-	fmt.Println("Total videos:", len(videoIDs))
+
+	ctx := context.Background()
 	for _, videoID := range videoIDs {
 		fmt.Printf("Downloading video: %s\n", videoID)
-		fmt.Printf("Finished downloading video: %s\n", videoID)
+		if err := downloadVideo(ctx, videoID); err != nil {
+			fmt.Fprintf(os.Stderr, "failed to download video %s: %v\n", videoID, err)
+			continue // エラーが発生しても次の動画をダウンロード
+		}
+		fmt.Printf("Successfully downloaded video: %s\n", videoID)
+		time.Sleep(1 * time.Second) // ダウンロード間隔を空ける
 	}
+
 	fmt.Println("All videos downloaded successfully.")
 }
