@@ -10,6 +10,9 @@ import (
 	"errors"
 	"io"
 	"encoding/json"
+	"context"
+
+	"github.com/wader/goutubedl"
 
 	"github.com/joho/godotenv"
 )
@@ -19,6 +22,7 @@ func init() {
 	if err := godotenv.Load(); err != nil {
 			log.Println(".env ファイルが見つかりませんでした（環境変数が既にセットされている可能性があります）")
 	}
+	goutubedl.Path = "yt-dlp"
 }
 
 type Config struct {
@@ -120,6 +124,30 @@ func getPlaylistVideos(cfg *Config) ([]string, error) {
 	return videoIDs, nil
 }
 
+func downloadWithYtDlp(ctx context.Context, videoURL, outpath string) error {
+	opts := goutubedl.Options{}
+	result, err := goutubedl.New(ctx, videoURL, opts)
+	if err != nil {
+			return fmt.Errorf("goutubedl.New: %w", err)
+	}
+	downloadResult, err := result.Download(ctx, "best")
+	if err != nil {
+			return fmt.Errorf("Download: %w", err)
+	}
+	defer downloadResult.Close()
+
+	f, err := os.Create(outpath)
+	if err != nil {
+			return fmt.Errorf("os.Create: %w", err)
+	}
+	defer f.Close()
+
+	if _, err := io.Copy(f, downloadResult); err != nil {
+			return fmt.Errorf("io.Copy: %w", err)
+	}
+	return nil
+}
+
 func main() {
 	cfg, err := LoadConfig()
 	if err != nil {
@@ -137,9 +165,20 @@ func main() {
 		fmt.Printf("Video ID:%d: %s\n", i, videoID)
 	}
 	fmt.Println("Total videos:", len(videoIDs))
+
+	ctx := context.Background()
 	for _, videoID := range videoIDs {
 		fmt.Printf("Downloading video: %s\n", videoID)
+		url := "https://www.youtube.com/watch?v=" + videoID
+		out := fmt.Sprintf("%s.mp4", videoID)
+		log.Printf("Downloading %s → %s …", url, out)
+		if err := downloadWithYtDlp(ctx, url, out); err != nil {
+				log.Printf("▶ ダウンロード失敗 (%s): %v", videoID, err)
+				continue
+		}
+		log.Printf("✓ 完了: %s", out)
 		fmt.Printf("Finished downloading video: %s\n", videoID)
 	}
+
 	fmt.Println("All videos downloaded successfully.")
 }
