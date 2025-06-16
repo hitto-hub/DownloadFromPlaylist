@@ -24,6 +24,24 @@ func init() {
 			log.Println(".env ファイルが見つかりませんでした（環境変数が既にセットされている可能性があります）")
 	}
 	goutubedl.Path = "yt-dlp"
+
+	_, err := os.Lstat("./Video")
+	if err == nil {
+		fmt.Println("return")
+		return
+	}
+
+	fileInfo, err := os.Lstat("./")
+	if err != nil {
+		fmt.Println(err)
+	}
+
+
+	fileMode := fileInfo.Mode()
+	unixPerms := fileMode & os.ModePerm
+	if err := os.Mkdir("Video/", unixPerms); err != nil {
+		log.Fatal(err)
+	}
 }
 
 type Config struct {
@@ -127,7 +145,7 @@ func getPlaylistVideos(cfg *Config) ([]string, error) {
 
 func downloadVideo(ctx context.Context, videoID string) error {
 	videoURL := "https://www.youtube.com/watch?v=" + videoID
-	out := videoID + ".mp4"
+	out := "Video/" + videoID + ".mp4"
 
 	// タイムアウト付きコンテキスト（例：動画あたり 60 秒）
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
@@ -144,12 +162,13 @@ func downloadVideo(ctx context.Context, videoID string) error {
 	}
 	defer dl.Close()
 
+	// ファイルに書き出し
 	f, err := os.Create(out)
 	if err != nil {
 		return fmt.Errorf("file create failed: %w", err)
 	}
 	defer f.Close()
-
+	// dl（ダウンロードストリーム）から f（ファイル）へ全バイトをコピー
 	if _, err := io.Copy(f, dl); err != nil {
 		return fmt.Errorf("file write failed: %w", err)
 	}

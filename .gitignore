@@ -1,3 +1,4 @@
 .env
 /tmp
+/test
 .DS_Store
