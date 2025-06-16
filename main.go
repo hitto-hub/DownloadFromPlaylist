@@ -10,11 +10,6 @@ import (
 	"errors"
 	"io"
 	"encoding/json"
-	"time"
-	// "context"
-	// "strings"
-
-	"github.com/kkdai/youtube/v2"
 
 	"github.com/joho/godotenv"
 )
@@ -125,58 +120,6 @@ func getPlaylistVideos(cfg *Config) ([]string, error) {
 	return videoIDs, nil
 }
 
-
-// headerTransport は全リクエストにブラウザ風 User-Agent を付与
-type headerTransport struct {
-	rt http.RoundTripper
-}
-
-func (t *headerTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	req.Header.Set("User-Agent",
-			"Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
-					"AppleWebKit/537.36 (KHTML, like Gecko) " +
-					"Chrome/114.0.0.0 Safari/537.36")
-	return t.rt.RoundTrip(req)
-}
-
-// ExampleDownload : Example code for how to use this package for download video.
-func ExampleClient(videoID string) {
-	// 1. カスタム HTTP クライアントを作成
-	httpClient := &http.Client{
-		Timeout:       60 * time.Second, // 全リクエストを 60 秒で打ち切る
-		// Unlimited redirects: 常に nil を返してリダイレクトを追従
-    CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return nil },
-		// 実際のブラウザ風 UA
-    Transport:     &headerTransport{rt: http.DefaultTransport},
-	}
-	client := youtube.Client{
-			HTTPClient: httpClient,
-	}
-
-	video, err := client.GetVideo(videoID)
-	if err != nil {
-		panic(err)
-	}
-
-	formats := video.Formats.WithAudioChannels() // only get videos with audio
-	stream, _, err := client.GetStream(video, &formats[0])
-	if err != nil {
-		panic(err)
-	}
-	defer stream.Close()
-
-	file, err := os.Create(videoID + ".mp4")
-	if err != nil {
-		panic(err)
-	}
-	defer file.Close()
-
-	_, err = io.Copy(file, stream)
-	if err != nil {
-		panic(err)
-	}
-}
-
 func main() {
 	cfg, err := LoadConfig()
 	if err != nil {
@@ -196,7 +139,6 @@ func main() {
 	fmt.Println("Total videos:", len(videoIDs))
 	for _, videoID := range videoIDs {
 		fmt.Printf("Downloading video: %s\n", videoID)
-		ExampleClient(videoID)
 		fmt.Printf("Finished downloading video: %s\n", videoID)
 	}
 	fmt.Println("All videos downloaded successfully.")
