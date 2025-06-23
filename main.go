@@ -145,7 +145,7 @@ func getPlaylistVideos(cfg *Config) ([]string, error) {
 
 func downloadVideo(ctx context.Context, videoID string) error {
 	videoURL := "https://www.youtube.com/watch?v=" + videoID
-	out := "Video/" + videoID + ".mp4"
+	out := "Video/" + videoID + ".webm"
 
 	// タイムアウト付きコンテキスト（例：動画あたり 60 秒）
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
@@ -156,7 +156,8 @@ func downloadVideo(ctx context.Context, videoID string) error {
 	if err != nil {
 		return fmt.Errorf("goutubedl.New: %w", err)
 	}
-	dl, err := sess.Download(ctx, "best")
+	// dl, err := sess.Download(ctx, "best")
+	dl, err := sess.Download(ctx, "bestvideo+bestaudio")
 	if err != nil {
 		return fmt.Errorf("download failed: %w", err)
 	}
